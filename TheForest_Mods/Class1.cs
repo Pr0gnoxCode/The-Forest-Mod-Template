@@ -1,14 +1,13 @@
-﻿using HarmonyLib;
-using MelonLoader;
+﻿using MelonLoader;
 using UnityEngine;
-using TheForest.Items.Inventory; 
-using TheForest.Items;          
-using TheForest.Items.Utils;    
+using TheForest.Items.Inventory;
+using TheForest.Items;
+using TheForest.Items.Utils;
+using TheForest.Utils;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 
-[assembly: MelonInfo(typeof(MyModMenu), "The Forest Mod Menu", "1.0.3", "Pr0gnoxCode")]
+[assembly: MelonInfo(typeof(MyModMenu), "The Forest Mod Menu", "1.0.4", "Pr0gnoxCode")]
 [assembly: MelonGame("SKS", "TheForest")]
 
 public class MyModMenu : MelonMod
@@ -25,7 +24,7 @@ public class MyModMenu : MelonMod
     private Dictionary<int, string> itemIdToName;
 
     // Feature-Toggles
-    private bool infiniteHealth = false;
+    //private bool infiniteHealth = false;  //not implemented
     private bool infiniteAmmo = false;
     private bool godMode = false;
     private bool infiniteEnergy = false;
@@ -39,7 +38,7 @@ public class MyModMenu : MelonMod
 
     public override void OnApplicationStart()
     {
-        HarmonyLib.Harmony harmony = new HarmonyLib.Harmony("com.example.myfastwalkmod");
+        HarmonyLib.Harmony harmony = new HarmonyLib.Harmony("com.example.mytheforestmod");
         harmony.PatchAll();
         MelonLogger.Msg("My Mod Menu loaded onApplicationStart!");
 
@@ -72,21 +71,28 @@ public class MyModMenu : MelonMod
     public override void OnUpdate()
     {
         // Toggle Hauptmenü mit F10
-        if (Input.GetKeyDown(KeyCode.F10))
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F10))
             showMenu = !showMenu;
 
         // Toggle Fast Walk (F9)
-        if (Input.GetKeyDown(KeyCode.F9))
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F9))
         {
             fastWalk = !fastWalk;
             MelonLogger.Msg("Fast Walk: " + (fastWalk ? "enabled" : "disabled"));
         }
 
         // Toggle Infinite Energy (F8)
-        if (Input.GetKeyDown(KeyCode.F8))
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F8))
         {
             infiniteEnergy = !infiniteEnergy;
             MelonLogger.Msg("Infinite Energy: " + (infiniteEnergy ? "enabled" : "disabled"));
+        }
+
+        //Toogel GodMode (F7)
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F7))
+        {
+            godMode = !godMode;
+            MelonLogger.Msg("God Mode: " + (godMode ? "enabled" : "disabled"));
         }
 
         // Geschwindigkeitseinstellungen (Fast Walk)
@@ -161,11 +167,26 @@ public class MyModMenu : MelonMod
         GUILayout.BeginVertical();
 
         // Feature-Toggles
-        infiniteHealth = GUILayout.Toggle(infiniteHealth, "Infinite Health");
+        //infiniteHealth = GUILayout.Toggle(infiniteHealth, "Infinite Health");
         infiniteAmmo = GUILayout.Toggle(infiniteAmmo, "Infinite Ammo");
-        godMode = GUILayout.Toggle(godMode, "God Mode");
+        //godMode = GUILayout.Toggle(godMode, "God Mode");
         infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy");
         fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk");
+
+        bool newGodMode = GUILayout.Toggle(godMode, "God Mode");
+        if(newGodMode != godMode)
+        {
+            godMode = newGodMode;
+            if (godMode)
+            {
+                EnableGodMode();
+            }
+            else
+            {
+                DisableGodMode();
+            }
+        }
+
 
         GUILayout.Space(10);
         // Button zum Umschalten des Inventarfensters
@@ -256,4 +277,41 @@ public class MyModMenu : MelonMod
             MelonLogger.Msg("Player not found.");
         }
     }
+
+    #region GodMode Funktionen
+
+    /// <summary>
+    /// Aktiviert den GodMode:
+    /// Setzt die Spieler-Stats auf voll, schaltet Überlebensfeatures aus und aktiviert unendliche Energie.
+    /// </summary>
+    private void EnableGodMode()
+    {
+        if (LocalPlayer.Stats != null)
+        {
+            // Setze volle Werte
+            LocalPlayer.Stats.Health = 100f;
+            LocalPlayer.Stats.Energy = 100f;
+            LocalPlayer.Stats.Stamina = 100f;
+            LocalPlayer.Stats.Fullness = 100f;
+            LocalPlayer.Stats.Thirst = 0f;
+        }
+        // Deaktiviere Überlebensfeatures und aktiviere Infinite Energy
+        Cheats.NoSurvival = true;
+        Cheats.InfiniteEnergy = true;
+        Cheats.GodMode = true;
+        //MelonLogger.Msg("God Mode enabled");
+    }
+
+    /// <summary>
+    /// Deaktiviert den GodMode und stellt Überlebensfeatures wieder her.
+    /// </summary>
+    private void DisableGodMode()
+    {
+        Cheats.NoSurvival = false;
+        Cheats.InfiniteEnergy = false;
+        Cheats.GodMode = false;
+        //MelonLogger.Msg("God Mode disabled");
+    }
+
+    #endregion
 }
