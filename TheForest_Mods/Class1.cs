@@ -6,6 +6,9 @@ using TheForest.Items.Utils;
 using TheForest.Utils;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+using System;
+using static CoopPlayerUpgrades;
 
 [assembly: MelonInfo(typeof(MyModMenu), "The Forest Mod Menu", "1.0.4", "Pr0gnoxCode")]
 [assembly: MelonGame("SKS", "TheForest")]
@@ -24,8 +27,8 @@ public class MyModMenu : MelonMod
     private Dictionary<int, string> itemIdToName;
 
     // Feature-Toggles
-    //private bool infiniteHealth = false;  //not implemented
-    private bool infiniteAmmo = false;
+    //private bool infiniteHealth = false;  //nicht implementiert
+    private bool infiniteFlaireAmmo = false;
     private bool godMode = false;
     private bool infiniteEnergy = false;
     public static bool fastWalk = false;
@@ -56,13 +59,13 @@ public class MyModMenu : MelonMod
 
         List<int> ids = new List<int>();
         itemIdToName = new Dictionary<int, string>();
-        foreach (Item item in ItemDatabase.Items)
+        foreach (TheForest.Items.Item item in ItemDatabase.Items)
         {
             ids.Add(item._id);
-            // Verwende den originalen Namen, ohne Veränderung:
+            // Verwende den originalen Namen, unverändert:
             itemIdToName[item._id] = item._name;
         }
-        // Sortiere die IDs anhand des originalen Namens alphabetisch
+        // Sortiere die IDs alphabetisch anhand des originalen Namens
         ids.Sort((a, b) => itemIdToName[a].CompareTo(itemIdToName[b]));
         inventoryItemIDs = ids.ToArray();
         MelonLogger.Msg("Loaded " + inventoryItemIDs.Length + " items from ItemDatabase.");
@@ -88,13 +91,24 @@ public class MyModMenu : MelonMod
             MelonLogger.Msg("Infinite Energy: " + (infiniteEnergy ? "enabled" : "disabled"));
         }
 
-        //Toogel GodMode (F7)
+        // Toggle God Mode (F7)
         if (UnityEngine.Input.GetKeyDown(KeyCode.F7))
         {
             godMode = !godMode;
             MelonLogger.Msg("God Mode: " + (godMode ? "enabled" : "disabled"));
+            if (godMode)
+                EnableGodMode();
+            else
+                DisableGodMode();
         }
 
+        // Toggle Infinite Flaire Ammo (F6)
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F6))
+        {
+            infiniteFlaireAmmo = !infiniteFlaireAmmo;
+            MelonLogger.Msg("Infinite Flaire Ammo: " + (infiniteFlaireAmmo ? "enabled" : "disabled"));
+        }
+                
         // Geschwindigkeitseinstellungen (Fast Walk)
         FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
         if (fpc != null)
@@ -126,15 +140,14 @@ public class MyModMenu : MelonMod
                 }
             }
 
+            // Infinite Energy: Setze Stamina-Kosten auf 0
             if (infiniteEnergy)
             {
                 fpc.staminaCostPerSec = 0.0f;
             }
-            else
-            {
-                fpc.staminaCostPerSec = 4.0f;
-            }
         }
+
+        UpdateInfiniteFlaireAmmoSetting();
     }
 
     public override void OnGUI()
@@ -142,7 +155,6 @@ public class MyModMenu : MelonMod
         // Zeichne das Hauptmod-Menü
         if (showMenu)
         {
-            // Wenn die Maus über dem Hauptfenster ist, fokussiere es
             if (mainWindowRect.Contains(Event.current.mousePosition))
             {
                 GUI.FocusWindow(0);
@@ -153,7 +165,6 @@ public class MyModMenu : MelonMod
         // Zeichne das Inventarfenster separat, wenn es aktiv ist
         if (showInventorySubmenu)
         {
-            // Feste Position rechts neben dem Hauptfenster
             if (inventoryWindowRect.Contains(Event.current.mousePosition))
             {
                 GUI.FocusWindow(1);
@@ -167,26 +178,21 @@ public class MyModMenu : MelonMod
         GUILayout.BeginVertical();
 
         // Feature-Toggles
-        //infiniteHealth = GUILayout.Toggle(infiniteHealth, "Infinite Health");
-        infiniteAmmo = GUILayout.Toggle(infiniteAmmo, "Infinite Ammo");
-        //godMode = GUILayout.Toggle(godMode, "God Mode");
-        infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy");
-        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk");
+        //infiniteHealth = GUILayout.Toggle(infiniteHealth, "Infinite Health");   //Not impelemented
+        infiniteFlaireAmmo = GUILayout.Toggle(infiniteFlaireAmmo, "Infinite Flaire Ammo");
 
+        //godMode wird hier zusätzlich als Toggle dargestellt:
         bool newGodMode = GUILayout.Toggle(godMode, "God Mode");
-        if(newGodMode != godMode)
+        if (newGodMode != godMode)
         {
             godMode = newGodMode;
             if (godMode)
-            {
                 EnableGodMode();
-            }
             else
-            {
                 DisableGodMode();
-            }
         }
-
+        infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy");
+        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk");
 
         GUILayout.Space(10);
         // Button zum Umschalten des Inventarfensters
@@ -205,13 +211,13 @@ public class MyModMenu : MelonMod
     {
         GUILayout.BeginVertical();
         GUILayout.Label("Inventory Items:");
-        inventoryScrollPos = GUILayout.BeginScrollView(inventoryScrollPos, GUILayout.Height(300));
+        inventoryScrollPos = GUILayout.BeginScrollView(inventoryScrollPos, GUILayout.Height(750));
         if (inventoryItemIDs != null)
         {
             foreach (int itemID in inventoryItemIDs)
             {
                 string displayName = "Unknown";
-                Item item = ItemDatabase.ItemById(itemID);
+                TheForest.Items.Item item = ItemDatabase.ItemById(itemID);
                 if (item != null)
                     displayName = item._name;
 
@@ -237,7 +243,7 @@ public class MyModMenu : MelonMod
         GUI.DragWindow();
     }
 
-    // Nutzt die offizielle AddItem-Methode der PlayerInventory, um ein Item per ID hinzuzufügen.
+
     private void AddInventoryItem(int itemID)
     {
         PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
@@ -255,7 +261,7 @@ public class MyModMenu : MelonMod
         }
     }
 
-    // Verwendet die offizielle SpawnItem-Methode aus ItemUtils, um ein Item zu spawnen.
+    
     private void SpawnInventoryItem(int itemID)
     {
         FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
@@ -278,12 +284,8 @@ public class MyModMenu : MelonMod
         }
     }
 
-    #region GodMode Funktionen
-
-    /// <summary>
-    /// Aktiviert den GodMode:
-    /// Setzt die Spieler-Stats auf voll, schaltet Überlebensfeatures aus und aktiviert unendliche Energie.
-    /// </summary>
+   
+    // Setzt die Spieler-Stats auf voll, schaltet Überlebensfeatures aus und aktiviert unendliche Energie.
     private void EnableGodMode()
     {
         if (LocalPlayer.Stats != null)
@@ -299,19 +301,54 @@ public class MyModMenu : MelonMod
         Cheats.NoSurvival = true;
         Cheats.InfiniteEnergy = true;
         Cheats.GodMode = true;
-        //MelonLogger.Msg("God Mode enabled");
+        MelonLogger.Msg("God Mode enabled");
     }
-
-    /// <summary>
-    /// Deaktiviert den GodMode und stellt Überlebensfeatures wieder her.
-    /// </summary>
+    
+    // Deaktiviert den GodMode und stellt Überlebensfeatures wieder her.
     private void DisableGodMode()
     {
         Cheats.NoSurvival = false;
         Cheats.InfiniteEnergy = false;
         Cheats.GodMode = false;
-        //MelonLogger.Msg("God Mode disabled");
+        MelonLogger.Msg("God Mode disabled");
     }
 
-    #endregion
+
+    // Prüft in jedem Update, ob infiniteFlaireAmmo aktiviert ist und fügt ggf. so lange Flaire Ammo hinzu,
+    // dass der Bestand im Inventar 999999 erreicht.
+    private void UpdateInfiniteFlaireAmmoSetting()
+    {
+        int desiredAmmo = 999999;
+        bool added = false;
+
+        // Hole das PlayerInventory
+        PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
+        
+        if (inventory == null)
+        {
+            //MelonLogger.Msg("PlayerInventory not found in UpdateInfiniteFlaireAmmoSetting.");
+            return;
+        }
+
+        // Ermittle die aktuell vorhandene Anzahl dieses Items.
+        int currentAmmo = inventory.AmountOf(107, false);
+
+        if (infiniteFlaireAmmo)
+        {
+            if (currentAmmo < desiredAmmo)
+            {   
+                int toAdd = desiredAmmo - currentAmmo;
+                added = inventory.AddItem(107, UnityEngine.Random.Range(999990, 999999), false, false, null);
+                
+                if (added)
+                {
+                    MelonLogger.Msg("Infinite Ammo enabled: Added Flaire Ammo, total now " + inventory.AmountOf(107, false));
+                }
+                else
+                {
+                    MelonLogger.Msg("Failed to add Flaire Ammo for Infinite Ammo.");
+                }
+            }
+        }
+    }
 }
