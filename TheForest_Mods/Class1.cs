@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System;
 using static CoopPlayerUpgrades;
+using HutongGames.PlayMaker.Actions;
 
 [assembly: MelonInfo(typeof(MyModMenu), "The Forest Mod Menu", "1.0.4", "Pr0gnoxCode")]
 [assembly: MelonGame("SKS", "TheForest")]
@@ -17,7 +18,7 @@ public class MyModMenu : MelonMod
 {
     // Hauptmenü-Felder
     private bool showMenu = false;
-    private Rect mainWindowRect = new Rect(100, 100, 350, 400);
+    private Rect mainWindowRect = new Rect(100, 100, 250, 300);
 
     // Inventarfenster (separat)
     private bool showInventorySubmenu = false;
@@ -32,6 +33,13 @@ public class MyModMenu : MelonMod
     private bool godMode = false;
     private bool infiniteEnergy = false;
     public static bool fastWalk = false;
+    private bool noclipEnabled = false; // Noclip Toggle
+    private bool _noclipEnabledHasRun = false; // Check if Noclip runs already or not
+
+    // Noclip-bezogene Felder
+    private float noclipSpeed = 100f;
+    private readonly List<Collider> playerColliders = new List<Collider>();
+    private Rigidbody playerRigidbody;
 
     // Geschwindigkeitswerte speichern
     private static float originalWalkSpeed = 0f;
@@ -73,9 +81,13 @@ public class MyModMenu : MelonMod
 
     public override void OnUpdate()
     {
-        // Toggle Hauptmenü mit F10
-        if (UnityEngine.Input.GetKeyDown(KeyCode.F10))
+        // Toggle Hauptmenü mit Insert
+        if (UnityEngine.Input.GetKeyDown(KeyCode.Insert))
             showMenu = !showMenu;
+
+        //Toggle Inventory Window with  F10
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F10))
+            showInventorySubmenu = !showInventorySubmenu;
 
         // Toggle Fast Walk (F9)
         if (UnityEngine.Input.GetKeyDown(KeyCode.F9))
@@ -108,7 +120,15 @@ public class MyModMenu : MelonMod
             infiniteFlaireAmmo = !infiniteFlaireAmmo;
             MelonLogger.Msg("Infinite Flaire Ammo: " + (infiniteFlaireAmmo ? "enabled" : "disabled"));
         }
-                
+
+        // Toggle Noclip (F5)
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F5))
+        {
+            noclipEnabled = !noclipEnabled;
+            ToggleNoclip(noclipEnabled);
+            MelonLogger.Msg("Noclip: " + (noclipEnabled ? "enabled" : "disabled"));
+        }
+
         // Geschwindigkeitseinstellungen (Fast Walk)
         FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
         if (fpc != null)
@@ -144,10 +164,29 @@ public class MyModMenu : MelonMod
             if (infiniteEnergy)
             {
                 fpc.staminaCostPerSec = 0.0f;
-            }
-        }
+            }            
+        }   
 
         UpdateInfiniteFlaireAmmoSetting();
+
+        // Noclip-Bewegung: Wenn Noclip aktiviert, erlaube freie Bewegung
+        if (noclipEnabled && fpc != null)
+        {
+            Vector3 horizontal = Vector3.zero;
+            if (UnityEngine.Input.GetKey(KeyCode.W)) { horizontal += fpc.transform.forward; }
+            if (UnityEngine.Input.GetKey(KeyCode.S)) { horizontal -= fpc.transform.forward; }
+            if (UnityEngine.Input.GetKey(KeyCode.A)) { horizontal -= fpc.transform.right; }
+            if (UnityEngine.Input.GetKey(KeyCode.D)) { horizontal += fpc.transform.right; }
+
+            Vector3 vertical = Vector3.zero;
+            if (UnityEngine.Input.GetKey(KeyCode.Space)) { vertical = Vector3.up; }
+            if (UnityEngine.Input.GetKey(KeyCode.LeftControl)) { vertical = Vector3.down; }
+
+            Vector3 newPos = fpc.transform.position + (horizontal + vertical) * noclipSpeed * Time.deltaTime;
+            fpc.transform.position = newPos;
+        }
+
+
     }
 
     public override void OnGUI()
@@ -178,11 +217,10 @@ public class MyModMenu : MelonMod
         GUILayout.BeginVertical();
 
         // Feature-Toggles
-        //infiniteHealth = GUILayout.Toggle(infiniteHealth, "Infinite Health");   //Not impelemented
-        infiniteFlaireAmmo = GUILayout.Toggle(infiniteFlaireAmmo, "Infinite Flaire Ammo");
+        infiniteFlaireAmmo = GUILayout.Toggle(infiniteFlaireAmmo, "Infinite Flaire Ammo (F6)");
 
-        //godMode wird hier zusätzlich als Toggle dargestellt:
-        bool newGodMode = GUILayout.Toggle(godMode, "God Mode");
+        // God Mode Toggle
+        bool newGodMode = GUILayout.Toggle(godMode, "God Mode (F7)");
         if (newGodMode != godMode)
         {
             godMode = newGodMode;
@@ -191,12 +229,15 @@ public class MyModMenu : MelonMod
             else
                 DisableGodMode();
         }
-        infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy");
-        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk");
+        infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy (F8)");
+        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk (F9)");
 
+        // Noclip Toggle
+        noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
+        
         GUILayout.Space(10);
         // Button zum Umschalten des Inventarfensters
-        if (GUILayout.Button("Toggle Inventory Window"))
+        if (GUILayout.Button("Toggle Inventory Window (F10)"))
             showInventorySubmenu = !showInventorySubmenu;
 
         GUILayout.Space(10);
@@ -206,6 +247,7 @@ public class MyModMenu : MelonMod
         GUILayout.EndVertical();
         GUI.DragWindow();
     }
+
 
     private void DrawInventoryWindow(int windowID)
     {
@@ -243,7 +285,6 @@ public class MyModMenu : MelonMod
         GUI.DragWindow();
     }
 
-
     private void AddInventoryItem(int itemID)
     {
         PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
@@ -261,7 +302,6 @@ public class MyModMenu : MelonMod
         }
     }
 
-    
     private void SpawnInventoryItem(int itemID)
     {
         FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
@@ -284,7 +324,6 @@ public class MyModMenu : MelonMod
         }
     }
 
-   
     // Setzt die Spieler-Stats auf voll, schaltet Überlebensfeatures aus und aktiviert unendliche Energie.
     private void EnableGodMode()
     {
@@ -303,7 +342,8 @@ public class MyModMenu : MelonMod
         Cheats.GodMode = true;
         MelonLogger.Msg("God Mode enabled");
     }
-    
+
+
     // Deaktiviert den GodMode und stellt Überlebensfeatures wieder her.
     private void DisableGodMode()
     {
@@ -311,6 +351,12 @@ public class MyModMenu : MelonMod
         Cheats.InfiniteEnergy = false;
         Cheats.GodMode = false;
         MelonLogger.Msg("God Mode disabled");
+    }
+
+    private IEnumerator DisableGodModeDelayed()
+    {
+        yield return new WaitForSeconds(30f);
+        DisableGodMode();
     }
 
 
@@ -323,10 +369,9 @@ public class MyModMenu : MelonMod
 
         // Hole das PlayerInventory
         PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
-        
+
         if (inventory == null)
         {
-            //MelonLogger.Msg("PlayerInventory not found in UpdateInfiniteFlaireAmmoSetting.");
             return;
         }
 
@@ -336,10 +381,10 @@ public class MyModMenu : MelonMod
         if (infiniteFlaireAmmo)
         {
             if (currentAmmo < desiredAmmo)
-            {   
+            {
                 int toAdd = desiredAmmo - currentAmmo;
                 added = inventory.AddItem(107, UnityEngine.Random.Range(999990, 999999), false, false, null);
-                
+
                 if (added)
                 {
                     MelonLogger.Msg("Infinite Ammo enabled: Added Flaire Ammo, total now " + inventory.AmountOf(107, false));
@@ -351,4 +396,70 @@ public class MyModMenu : MelonMod
             }
         }
     }
+
+    // Noclip-Funktion: Deaktiviert bzw. reaktiviert die Kollisionskomponenten und Schwerkraft des Spielers
+    private void ToggleNoclip(bool enabled)
+    {
+        FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
+        if (fpc != null)
+        {
+            // Beim ersten Aufruf alle relevanten Collider sammeln
+            if (playerColliders.Count == 0)
+            {
+                playerColliders.AddRange(fpc.GetComponentsInChildren<Collider>());
+            }
+
+            if (enabled)
+            {   
+                // activate GodMode so the player doesn't die in Noclip
+                if (!godMode && !_noclipEnabledHasRun)
+                {
+                    EnableGodMode();
+                    _noclipEnabledHasRun = true;
+                }
+                                
+                // Deaktiviere alle Collider
+                foreach (var col in playerColliders)
+                {
+                    col.enabled = false;
+                }
+                // Deaktiviere den CharacterController, falls vorhanden
+                CharacterController cc = fpc.GetComponent<CharacterController>();
+                if (cc != null)
+                    cc.enabled = false;
+
+                // Setze den Rigidbody auf kinematisch, um physikalische Einflüsse zu unterbinden
+                playerRigidbody = fpc.GetComponent<Rigidbody>();
+                if (playerRigidbody != null)
+                {
+                    playerRigidbody.isKinematic = true;
+                    // Optional: Setze auch die Geschwindigkeit auf 0, um Restkräfte zu löschen
+                    playerRigidbody.velocity = Vector3.zero;
+                }
+            }
+            else
+            {
+                // Reaktiviere alle Collider
+                foreach (var col in playerColliders)
+                {
+                    col.enabled = true;
+                }
+                // Reaktiviere den CharacterController, falls vorhanden
+                CharacterController cc = fpc.GetComponent<CharacterController>();
+                if (cc != null)
+                    cc.enabled = true;
+
+                // Setze den Rigidbody wieder auf nicht-kinematisch, damit die Physik erneut greift
+                if (playerRigidbody != null)
+                {
+                    playerRigidbody.isKinematic = false;
+                }
+                
+                //disable GodMode
+                _noclipEnabledHasRun = false;
+                MelonCoroutines.Start(DisableGodModeDelayed());                
+            }
+        }
+    }
+
 }
