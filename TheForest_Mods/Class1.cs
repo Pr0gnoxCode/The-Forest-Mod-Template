@@ -37,9 +37,11 @@ public class MyModMenu : MelonMod
     private bool _noclipEnabledHasRun = false; // Check if Noclip runs already or not
 
     // Noclip-bezogene Felder
-    private float noclipSpeed = 100f;
+    private float noclipSpeed = 50f;
     private readonly List<Collider> playerColliders = new List<Collider>();
+    private readonly object EditorGUILayout;
     private Rigidbody playerRigidbody;
+    private float noClipSpeedchange = 20f;
 
     // Geschwindigkeitswerte speichern
     private static float originalWalkSpeed = 0f;
@@ -172,6 +174,10 @@ public class MyModMenu : MelonMod
         // Noclip-Bewegung: Wenn Noclip aktiviert, erlaube freie Bewegung
         if (noclipEnabled && fpc != null)
         {
+            if (noClipSpeedchange <= 200f && noClipSpeedchange >= 20f)
+            {
+                noclipSpeed = noClipSpeedchange;
+            }
             Vector3 horizontal = Vector3.zero;
             if (UnityEngine.Input.GetKey(KeyCode.W)) { horizontal += fpc.transform.forward; }
             if (UnityEngine.Input.GetKey(KeyCode.S)) { horizontal -= fpc.transform.forward; }
@@ -232,9 +238,15 @@ public class MyModMenu : MelonMod
         infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy (F8)");
         fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk (F9)");
 
-        // Noclip Toggle
+        // Noclip Toggle and speed
         noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
-        
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Noclip Speed:");
+        noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 20f, 200f);
+        GUILayout.EndHorizontal();
+
+
+
         GUILayout.Space(10);
         // Button zum Umschalten des Inventarfensters
         if (GUILayout.Button("Toggle Inventory Window (F10)"))
@@ -410,14 +422,14 @@ public class MyModMenu : MelonMod
             }
 
             if (enabled)
-            {   
+            {
                 // activate GodMode so the player doesn't die in Noclip
                 if (!godMode && !_noclipEnabledHasRun)
                 {
                     EnableGodMode();
                     _noclipEnabledHasRun = true;
                 }
-                                
+
                 // Deaktiviere alle Collider
                 foreach (var col in playerColliders)
                 {
@@ -454,10 +466,13 @@ public class MyModMenu : MelonMod
                 {
                     playerRigidbody.isKinematic = false;
                 }
-                
+
                 //disable GodMode
-                _noclipEnabledHasRun = false;
-                MelonCoroutines.Start(DisableGodModeDelayed());                
+                if (!godMode)
+                {
+                    MelonCoroutines.Start(DisableGodModeDelayed());
+                    _noclipEnabledHasRun = false;
+                }
             }
         }
     }
