@@ -48,6 +48,7 @@ public class MyModMenu : MelonMod
     private static float originalRunSpeed = 0f;
     private static float originalCrouchSpeed = 0f;
     private static float originalSwimmingSpeed = 0f;
+    private static float fastWalkSpeedchange = 3f;
 
     public override void OnApplicationStart()
     {
@@ -144,11 +145,14 @@ public class MyModMenu : MelonMod
                     originalCrouchSpeed = fpc.crouchSpeed;
                     originalSwimmingSpeed = fpc.swimmingSpeed;
                 }
-                fpc.walkSpeed = originalWalkSpeed * 4.0f;
-                fpc.runSpeed = originalRunSpeed * 4.0f;
-                fpc.crouchSpeed = originalCrouchSpeed * 4.0f;
-                fpc.swimmingSpeed = originalSwimmingSpeed * 4.0f;
-                fpc.staminaCostPerSec = 0.0f;
+
+                fpc.walkSpeed = fastWalkSpeedchange;
+                fpc.runSpeed = fastWalkSpeedchange;
+                fpc.crouchSpeed = fastWalkSpeedchange;
+                fpc.swimmingSpeed = fastWalkSpeedchange;
+                fpc.maxSwimVelocity = fastWalkSpeedchange;
+                fpc.maxDiveVelocity = originalSwimmingSpeed * fastWalkSpeedchange;
+                fpc.staminaCostPerSec = 0.0f;                
             }
             else
             {
@@ -158,6 +162,8 @@ public class MyModMenu : MelonMod
                     fpc.runSpeed = originalRunSpeed;
                     fpc.crouchSpeed = originalCrouchSpeed;
                     fpc.swimmingSpeed = originalSwimmingSpeed;
+                    fpc.maxSwimVelocity = originalSwimmingSpeed;
+                    fpc.maxDiveVelocity = 7f;
                     fpc.staminaCostPerSec = 4.0f;
                 }
             }
@@ -236,8 +242,8 @@ public class MyModMenu : MelonMod
             else
                 DisableGodMode();
         }
+
         infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy (F8)");
-        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk (F9)");
 
         // Noclip Toggle and speed
         noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
@@ -245,8 +251,12 @@ public class MyModMenu : MelonMod
         GUILayout.Label("Noclip Speed:");
         noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 50f, 500f);
         GUILayout.EndHorizontal();
-
         GUILayout.Space(10);
+
+        fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk (F9)");
+        fastWalkSpeedchange = GUILayout.HorizontalSlider(fastWalkSpeedchange, 3f, 100f);
+        GUILayout.Space(20);
+
         // Button zum Umschalten des Inventarfensters
         if (GUILayout.Button("Toggle Inventory Window (F10)"))
             showInventorySubmenu = !showInventorySubmenu;
