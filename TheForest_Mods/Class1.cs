@@ -37,7 +37,7 @@ public class MyModMenu : MelonMod
     private bool _noclipEnabledHasRun = false; // Check if Noclip runs already or not
 
     // Noclip-bezogene Felder
-    private float noclipSpeed = 50f;
+    private float noclipSpeed = 20f;
     private readonly List<Collider> playerColliders = new List<Collider>();
     private readonly object EditorGUILayout;
     private Rigidbody playerRigidbody;
@@ -173,11 +173,12 @@ public class MyModMenu : MelonMod
 
         // Noclip-Bewegung: Wenn Noclip aktiviert, erlaube freie Bewegung
         if (noclipEnabled && fpc != null)
-        {
-            if (noClipSpeedchange <= 200f && noClipSpeedchange >= 20f)
+        {            
+            if (noClipSpeedchange <= 500f && noClipSpeedchange >= 20f)
             {
                 noclipSpeed = noClipSpeedchange;
-            }
+            }            
+
             Vector3 horizontal = Vector3.zero;
             if (UnityEngine.Input.GetKey(KeyCode.W)) { horizontal += fpc.transform.forward; }
             if (UnityEngine.Input.GetKey(KeyCode.S)) { horizontal -= fpc.transform.forward; }
@@ -242,10 +243,8 @@ public class MyModMenu : MelonMod
         noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
         GUILayout.BeginHorizontal();
         GUILayout.Label("Noclip Speed:");
-        noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 20f, 200f);
+        noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 50f, 500f);
         GUILayout.EndHorizontal();
-
-
 
         GUILayout.Space(10);
         // Button zum Umschalten des Inventarfensters
@@ -265,6 +264,20 @@ public class MyModMenu : MelonMod
     {
         GUILayout.BeginVertical();
         GUILayout.Label("Inventory Items:");
+        
+        GUI.contentColor = Color.green;
+        Color currentcontentColor = GUI.contentColor;
+        Color previousColor = GUI.color;
+
+        GUI.contentColor = Color.red;
+        GUI.color = Color.red;
+        if (GUILayout.Button("Add Max. for all Item to Inventory"))
+        {
+            AddMaxItemsToInventory();
+        }
+        GUI.color = previousColor;
+        GUI.contentColor = currentcontentColor;
+
         inventoryScrollPos = GUILayout.BeginScrollView(inventoryScrollPos, GUILayout.Height(750));
         if (inventoryItemIDs != null)
         {
@@ -289,7 +302,7 @@ public class MyModMenu : MelonMod
             GUILayout.Label("No inventory items available.");
         }
         GUILayout.EndScrollView();
-
+                
         if (GUILayout.Button("Close Inventory"))
             showInventorySubmenu = false;
 
@@ -335,6 +348,47 @@ public class MyModMenu : MelonMod
             MelonLogger.Msg("Player not found.");
         }
     }
+
+
+    private void AddMaxItemsToInventory()
+    {
+        PlayerInventory inventory = GameObject.FindObjectOfType<PlayerInventory>();
+        if (inventory != null)
+        {
+            foreach (int itemID in inventoryItemIDs)
+            {
+                TheForest.Items.Item item = ItemDatabase.ItemById(itemID);
+                if (item != null)
+                {
+                    int maxCount = 0;
+                    try
+                    {
+                        maxCount = item._maxAmount;
+                    }
+                    catch (Exception)
+                    {
+                        maxCount = 999999;
+                    }
+
+                    // Falls der Wert aus irgendeinem Grund nicht sinnvoll ist, einen Fallback nutzen
+                    if (maxCount <= 0)
+                        maxCount = 999999;
+
+                    bool added = inventory.AddItem(itemID, maxCount, false, false, null);
+                    if (added)
+                        MelonLogger.Msg("Added max count (" + maxCount + ") for item " + itemID);
+                    else
+                        MelonLogger.Msg("Failed to add max count for item " + itemID);
+                }
+            }
+        }
+        else
+        {
+            MelonLogger.Msg("PlayerInventory not found.");
+        }
+    }
+
+
 
     // Setzt die Spieler-Stats auf voll, schaltet Überlebensfeatures aus und aktiviert unendliche Energie.
     private void EnableGodMode()
@@ -427,6 +481,8 @@ public class MyModMenu : MelonMod
                 if (!godMode && !_noclipEnabledHasRun)
                 {
                     EnableGodMode();
+                    godMode = !godMode;
+                    //MelonLogger.Msg("God Mode: " + (godMode ? "enabled" : "disabled"));
                     _noclipEnabledHasRun = true;
                 }
 
@@ -476,5 +532,4 @@ public class MyModMenu : MelonMod
             }
         }
     }
-
 }
