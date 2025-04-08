@@ -8,12 +8,11 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System;
-using static CoopPlayerUpgrades;
-using HutongGames.PlayMaker.Actions;
+using TheForest;
+using TheForest.Buildings.Creation;
 
 [assembly: MelonInfo(typeof(MyModMenu), "The Forest Mod Menu", "1.0.4", "Pr0gnoxCode")]
 [assembly: MelonGame("SKS", "TheForest")]
-
 public class MyModMenu : MelonMod
 {
     // Hauptmenü-Felder
@@ -39,7 +38,6 @@ public class MyModMenu : MelonMod
     // Noclip-bezogene Felder
     private float noclipSpeed = 20f;
     private readonly List<Collider> playerColliders = new List<Collider>();
-    private readonly object EditorGUILayout;
     private Rigidbody playerRigidbody;
     private float noClipSpeedchange = 20f;
 
@@ -49,6 +47,10 @@ public class MyModMenu : MelonMod
     private static float originalCrouchSpeed = 0f;
     private static float originalSwimmingSpeed = 0f;
     private static float fastWalkSpeedchange = 3f;
+
+    // several other features
+    private static bool buildhack = false;
+    private static bool cancelAllGhosts = false;
 
     public override void OnApplicationStart()
     {
@@ -132,6 +134,32 @@ public class MyModMenu : MelonMod
             MelonLogger.Msg("Noclip: " + (noclipEnabled ? "enabled" : "disabled"));
         }
 
+        // Toggle Build Hack (F4)
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F4))
+        {
+            buildhack = !buildhack;
+            MelonLogger.Msg("Build Hack: " + (buildhack ? "enabled" : "disabled"));
+            Cheats.Creative = buildhack;
+        }
+
+        // Toggle Cancel all Ghosts (F3)
+        if (UnityEngine.Input.GetKeyDown(KeyCode.F3))
+        {
+            cancelAllGhosts = !cancelAllGhosts;
+            MelonLogger.Msg("Cancel all Ghosts: " + (cancelAllGhosts ? "enabled" : "disabled"));
+            if (cancelAllGhosts)
+            {
+                Craft_Structure[] array = UnityEngine.Object.FindObjectsOfType<Craft_Structure>();
+                if (array != null && array.Length > 0)
+                {
+                    foreach (Craft_Structure craft_Structure in array)
+                    {
+                        craft_Structure.CancelBlueprint();
+                    }
+                }
+            }
+        }
+
         // Geschwindigkeitseinstellungen (Fast Walk)
         FirstPersonCharacter fpc = GameObject.FindObjectOfType<FirstPersonCharacter>();
         if (fpc != null)
@@ -152,7 +180,7 @@ public class MyModMenu : MelonMod
                 fpc.swimmingSpeed = fastWalkSpeedchange;
                 fpc.maxSwimVelocity = fastWalkSpeedchange;
                 fpc.maxDiveVelocity = originalSwimmingSpeed * fastWalkSpeedchange;
-                fpc.staminaCostPerSec = 0.0f;                
+                fpc.staminaCostPerSec = 0.0f;
             }
             else
             {
@@ -172,18 +200,18 @@ public class MyModMenu : MelonMod
             if (infiniteEnergy)
             {
                 fpc.staminaCostPerSec = 0.0f;
-            }            
-        }   
+            }
+        }
 
         UpdateInfiniteFlaireAmmoSetting();
 
         // Noclip-Bewegung: Wenn Noclip aktiviert, erlaube freie Bewegung
         if (noclipEnabled && fpc != null)
-        {            
+        {
             if (noClipSpeedchange <= 500f && noClipSpeedchange >= 20f)
             {
                 noclipSpeed = noClipSpeedchange;
-            }            
+            }
 
             Vector3 horizontal = Vector3.zero;
             if (UnityEngine.Input.GetKey(KeyCode.W)) { horizontal += fpc.transform.forward; }
@@ -198,7 +226,7 @@ public class MyModMenu : MelonMod
             Vector3 newPos = fpc.transform.position + (horizontal + vertical) * noclipSpeed * Time.deltaTime;
             fpc.transform.position = newPos;
         }
-
+                
 
     }
 
@@ -229,6 +257,20 @@ public class MyModMenu : MelonMod
     {
         GUILayout.BeginVertical();
 
+        // Cancel all Ghosts Toogle
+        cancelAllGhosts = GUILayout.Toggle(cancelAllGhosts, "Cancel all Ghosts (F3)");
+
+        // Build Hack Toggle
+        buildhack = GUILayout.Toggle(buildhack, "Build Hack (F4)");
+        
+        // Noclip Toggle and speed
+        noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Noclip Speed:");
+        noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 50f, 500f);
+        GUILayout.EndHorizontal();
+        GUILayout.Space(10);
+
         // Feature-Toggles
         infiniteFlaireAmmo = GUILayout.Toggle(infiniteFlaireAmmo, "Infinite Flaire Ammo (F6)");
 
@@ -244,14 +286,6 @@ public class MyModMenu : MelonMod
         }
 
         infiniteEnergy = GUILayout.Toggle(infiniteEnergy, "Infinite Energy (F8)");
-
-        // Noclip Toggle and speed
-        noclipEnabled = GUILayout.Toggle(noclipEnabled, "Noclip (F5)");
-        GUILayout.BeginHorizontal();
-        GUILayout.Label("Noclip Speed:");
-        noClipSpeedchange = GUILayout.HorizontalSlider(noClipSpeedchange, 50f, 500f);
-        GUILayout.EndHorizontal();
-        GUILayout.Space(10);
 
         fastWalk = GUILayout.Toggle(fastWalk, "Fast Walk (F9)");
         fastWalkSpeedchange = GUILayout.HorizontalSlider(fastWalkSpeedchange, 3f, 100f);
@@ -274,7 +308,7 @@ public class MyModMenu : MelonMod
     {
         GUILayout.BeginVertical();
         GUILayout.Label("Inventory Items:");
-        
+
         GUI.contentColor = Color.green;
         Color currentcontentColor = GUI.contentColor;
         Color previousColor = GUI.color;
@@ -312,7 +346,7 @@ public class MyModMenu : MelonMod
             GUILayout.Label("No inventory items available.");
         }
         GUILayout.EndScrollView();
-                
+
         if (GUILayout.Button("Close Inventory"))
             showInventorySubmenu = false;
 
@@ -487,53 +521,55 @@ public class MyModMenu : MelonMod
 
             if (enabled)
             {
-                // activate GodMode so the player doesn't die in Noclip
+                // Aktiviert GodMode, falls nötig
                 if (!godMode && !_noclipEnabledHasRun)
                 {
                     EnableGodMode();
                     godMode = !godMode;
-                    //MelonLogger.Msg("God Mode: " + (godMode ? "enabled" : "disabled"));
                     _noclipEnabledHasRun = true;
                 }
 
-                // Deaktiviere alle Collider
+                // Deaktiviere nur physikalische Collider (die nicht als Trigger fungieren)
                 foreach (var col in playerColliders)
                 {
-                    col.enabled = false;
+                    if (!col.isTrigger)
+                    {
+                        col.enabled = false;
+                    }
+                    // Trigger-Collider bleiben aktiv, damit Interaktionen funktionieren
                 }
-                // Deaktiviere den CharacterController, falls vorhanden
+                // Deaktiviere den CharacterController (falls vorhanden)
                 CharacterController cc = fpc.GetComponent<CharacterController>();
                 if (cc != null)
                     cc.enabled = false;
 
-                // Setze den Rigidbody auf kinematisch, um physikalische Einflüsse zu unterbinden
+                // Setze den Rigidbody auf kinematisch, um physikalische Einflüsse auszuschalten
                 playerRigidbody = fpc.GetComponent<Rigidbody>();
                 if (playerRigidbody != null)
                 {
                     playerRigidbody.isKinematic = true;
-                    // Optional: Setze auch die Geschwindigkeit auf 0, um Restkräfte zu löschen
                     playerRigidbody.velocity = Vector3.zero;
                 }
             }
             else
             {
-                // Reaktiviere alle Collider
+                // Reaktiviere alle Collider (Trigger und physikalisch)
                 foreach (var col in playerColliders)
                 {
                     col.enabled = true;
                 }
-                // Reaktiviere den CharacterController, falls vorhanden
+                // Reaktiviere den CharacterController (falls vorhanden)
                 CharacterController cc = fpc.GetComponent<CharacterController>();
                 if (cc != null)
                     cc.enabled = true;
 
-                // Setze den Rigidbody wieder auf nicht-kinematisch, damit die Physik erneut greift
+                // Setze den Rigidbody wieder auf nicht-kinematisch
                 if (playerRigidbody != null)
                 {
                     playerRigidbody.isKinematic = false;
                 }
 
-                //disable GodMode
+                // Deaktiviere GodMode (sofern nicht dauerhaft aktiv)
                 if (!godMode)
                 {
                     MelonCoroutines.Start(DisableGodModeDelayed());
